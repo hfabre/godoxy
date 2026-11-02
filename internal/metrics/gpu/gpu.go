@@ -1,0 +1,62 @@
+// Package gpu collects per-engine GPU utilization.
+package gpu
+
+import (
+	"errors"
+	"sync"
+
+	"github.com/rs/zerolog/log"
+)
+
+type Stat struct {
+	Name        string             `json:"name"`
+	Engines     map[string]float64 `json:"engines"`               // busy percent (0-100) by engine
+	Temperature *float64           `json:"temperature,omitempty"` // celsius, if exposed by the driver
+} // @name GPUStat
+
+// Collector reports utilization for all GPUs of one kind (e.g. Intel).
+type Collector interface {
+	Collect() ([]Stat, error)
+}
+
+// ErrNotFound is returned by a collector factory when no GPU of its kind is present.
+var ErrNotFound = errors.New("no gpu found")
+
+var (
+	initOnce   sync.Once
+	collectors []Collector
+	collectMu  sync.Mutex
+)
+
+func initCollectors() {
+	for kind, newCollector := range factories {
+		c, err := newCollector()
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				log.Debug().Err(err).Str("kind", kind).Msg("gpu metrics disabled")
+			}
+			continue
+		}
+		collectors = append(collectors, c)
+	}
+}
+
+// Collect returns the current stats of every detected GPU.
+// GPUs that are absent or not readable (e.g. missing permission) are skipped.
+func Collect() []Stat {
+	initOnce.Do(initCollectors)
+
+	collectMu.Lock()
+	defer collectMu.Unlock()
+
+	var stats []Stat
+	for _, c := range collectors {
+		s, err := c.Collect()
+		if err != nil {
+			log.Debug().Err(err).Msg("failed to collect gpu stats")
+			continue
+		}
+		stats = append(stats, s...)
+	}
+	return stats
+}
