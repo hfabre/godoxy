@@ -33,7 +33,7 @@ func initCollectors() {
 		c, err := newCollector()
 		if err != nil {
 			if !errors.Is(err, ErrNotFound) {
-				log.Debug().Err(err).Str("kind", kind).Msg("gpu metrics disabled")
+				log.Warn().Err(err).Str("kind", kind).Msg("gpu metrics disabled")
 			}
 			continue
 		}
