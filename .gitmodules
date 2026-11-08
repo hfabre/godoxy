@@ -9,4 +9,4 @@
 	url = https://github.com/yusing/goutils.git
 [submodule "webui"]
 	path = webui
-	url = https://github.com/yusing/godoxy-webui
+	url = https://github.com/hfabre/godoxy-webui
